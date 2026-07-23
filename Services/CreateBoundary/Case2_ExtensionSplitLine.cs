@@ -5,7 +5,7 @@ using Autodesk.AutoCAD.DatabaseServices;
 using Autodesk.AutoCAD.EditorInput;
 using Autodesk.AutoCAD.Geometry;
 
-namespace GetPropsTool
+namespace MCG_CreateBoundary
 {
     public class Case2_ExtensionSplitLine
     {
@@ -14,27 +14,21 @@ namespace GetPropsTool
             List<Region> result = new List<Region>();
             List<Curve> cleanCurves = BoundaryUtils.PurifyInputCurves(curves);
 
-            ed.WriteMessage("\n[MCG] === BƯỚC 1-3: Xử lý Topo & Ray-Casting ===");
             SmartTopologyGapClosure(cleanCurves, ed);
 
             DBObjectCollection curveCol = new DBObjectCollection();
             foreach (var c in cleanCurves) curveCol.Add(c);
 
-            ed.WriteMessage("\n[MCG] === BƯỚC 4: Graph Traversal ===");
             DBObjectCollection shattered = BoundaryUtils.ShatterCurves(curveCol);
 
             try
             {
                 List<Polyline> closedLoops = ExtractClosedLoopsByRightHandRule(shattered);
-                
-                if (closedLoops.Count == 0)
-                {
-                    ed.WriteMessage("\n[MCG] LỖI: Không tìm thấy vòng khép kín.");
-                    return result;
-                }
+
+                if (closedLoops.Count == 0) return result;
 
                 DBObjectCollection loopRegionsCol = new DBObjectCollection();
-                
+
                 foreach (var loop in closedLoops)
                 {
                     Polyline purified = BoundaryUtils.PurifyPolyline(loop);
@@ -54,10 +48,10 @@ namespace GetPropsTool
 
                 if (loopRegionsCol.Count == 0) return result;
 
-                var validRegs = loopRegionsCol.Cast<Region>().Where(r => r.Area > 1.0).OrderBy(r => r.Area).ToList();
-                List<Region> innerRegs = BoundaryUtils.FilterInnerMost(validRegs);
+                // ĐÃ XÓA FilterInnerMost: Giữ lại toàn bộ các Đảo (Islands) và Khung bao (Outer)
+                var validRegs = loopRegionsCol.Cast<Region>().Where(r => r.Area > 1.0).ToList();
 
-                foreach (Region reg in innerRegs)
+                foreach (Region reg in validRegs)
                 {
                     result.Add((Region)reg.Clone());
                 }
@@ -82,7 +76,7 @@ namespace GetPropsTool
             {
                 if (c == outerBoundary) continue;
                 Point3d midPoint = GetMidPoint(c);
-                
+
                 if (!IsTouching(c.StartPoint, c, curves))
                 {
                     Vector3d dirStart = GetDirectionAtStart(c);
@@ -126,11 +120,11 @@ namespace GetPropsTool
                     if (target == sourceCurve) continue;
                     Point3dCollection pts = new Point3dCollection();
                     ray.IntersectWith(target, Intersect.OnBothOperands, pts, IntPtr.Zero, IntPtr.Zero);
-                    
-                    foreach (Point3d hit in pts) 
+
+                    foreach (Point3d hit in pts)
                     {
                         double distFromOrigin = origin.DistanceTo(hit);
-                        if (distFromOrigin > 1e-3) 
+                        if (distFromOrigin > 1e-3)
                         {
                             double distToMid = hit.DistanceTo(midPoint);
                             if (distToMid < minMidDistance)
@@ -151,7 +145,7 @@ namespace GetPropsTool
             List<Curve> segments = shatteredCurves.Cast<Curve>().ToList();
             if (segments.Count == 0) return loops;
 
-            double tolerance = 0.05; 
+            double tolerance = 0.05;
             var nodes = new List<Point3d>();
             var edges = new List<GraphEdge>();
 
@@ -213,10 +207,10 @@ namespace GetPropsTool
 
         private static Vector3d GetEdgeDirection(GraphEdge edge, bool isOutward)
         {
-            double param = isOutward ? 
-                (edge.IsForward ? edge.Curve.StartParam : edge.Curve.EndParam) : 
+            double param = isOutward ?
+                (edge.IsForward ? edge.Curve.StartParam : edge.Curve.EndParam) :
                 (edge.IsForward ? edge.Curve.EndParam : edge.Curve.StartParam);
-                
+
             Vector3d dir = edge.Curve.GetFirstDerivative(param).GetNormal();
             if (!isOutward && edge.IsForward) dir = -dir;
             if (isOutward && !edge.IsForward) dir = -dir;
@@ -240,10 +234,10 @@ namespace GetPropsTool
 
         private static bool IsTouching(Point3d pt, Curve ignoreCurve, List<Curve> others)
         {
-            foreach (Curve target in others) 
+            foreach (Curve target in others)
             {
                 if (target == ignoreCurve) continue;
-                if (target.GetClosestPointTo(pt, false).DistanceTo(pt) < 1e-3) return true; 
+                if (target.GetClosestPointTo(pt, false).DistanceTo(pt) < 1e-3) return true;
             }
             return false;
         }

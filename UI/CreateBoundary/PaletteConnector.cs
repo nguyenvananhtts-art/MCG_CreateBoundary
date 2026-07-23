@@ -1,10 +1,10 @@
 using Autodesk.AutoCAD.Windows;
 using Autodesk.AutoCAD.ApplicationServices;
-using GetPropsTool.Views;
-using GetPropsTool.ViewModels;
+using MCG_CreateBoundary.Views;
+using MCG_CreateBoundary.ViewModels;
 using System;
 
-namespace GetPropsTool.UI
+namespace MCG_CreateBoundary.UI
 {
     public class PaletteConnector
     {
@@ -19,12 +19,12 @@ namespace GetPropsTool.UI
                 {
                     // 1. Khởi tạo với định danh duy nhất
                     MyPS = new PaletteSet("MCG Boundary Manager", "SplitBoundary_Palette_V1", new Guid("D23B5A6F-7C4E-4B12-9D8A-C7F4E6A3B123"));
-                    
-                    // 2. Thiết lập Style NGAY LẬP TỨC (Chỉ làm 1 lần)
-                    MyPS.Style = PaletteSetStyles.ShowCloseButton | 
-                                 PaletteSetStyles.ShowAutoHideButton | 
+
+                    // 2. Thiết lập Style
+                    MyPS.Style = PaletteSetStyles.ShowCloseButton |
+                                 PaletteSetStyles.ShowAutoHideButton |
                                  PaletteSetStyles.ShowPropertiesMenu;
-                    
+
                     MyPS.Dock = DockSides.Right;
                     MyPS.MinimumSize = new System.Drawing.Size(300, 600);
 
@@ -36,14 +36,14 @@ namespace GetPropsTool.UI
 
                 // 4. Hiển thị Palette
                 MyPS.Visible = true;
-                
-                // 5. Đồng bộ dữ liệu
+
+                // 5. Đồng bộ dữ liệu (Quét bản vẽ hiện tại khi vừa mở bảng)
                 SyncData();
             }
             catch (Exception ex)
             {
-                // Nếu lỗi do trạng thái (như AutoRollUp), ta bỏ qua để user vẫn dùng được bảng
-                Application.DocumentManager.MdiActiveDocument.Editor.WriteMessage("\n[MCG] Palette Status: " + ex.Message);
+                var doc = Application.DocumentManager.MdiActiveDocument;
+                if (doc != null) doc.Editor.WriteMessage("\n[MCG] Palette Status: " + ex.Message);
             }
         }
 
@@ -52,9 +52,9 @@ namespace GetPropsTool.UI
             var doc = Application.DocumentManager.MdiActiveDocument;
             if (doc == null || MyVM == null) return;
 
-            try 
+            try
             {
-                // Sử dụng ScanDocument đã được fix lỗi IndexOutOfRange ở phiên bản trước
+                // Hàm ScanDocument tự động đọc dữ liệu bản vẽ đang hiển thị trên màn hình
                 var data = SplitBoundary.ScanDocument(doc.Database);
                 MyVM.UpdateList(data);
             }

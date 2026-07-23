@@ -22,21 +22,24 @@
             <CheckBox Content="Create Text inside boundary" IsChecked="{Binding IsCreateText}" Margin="0,3"/>
             <CheckBox Content="Delete original boundaries &amp; split lines" IsChecked="{Binding IsDeleteOriginal}" Margin="0,3"/>
             <CheckBox Content="Insert COG block" IsChecked="{Binding IsInsertCog}" Margin="0,3"/>
+            <CheckBox Content="Automatically subtract hole area" IsChecked="{Binding IsSubtractHole}" Margin="0,3" FontWeight="SemiBold" Foreground="#8B0000"/>
         </StackPanel>
 
         <Grid Grid.Row="2" Margin="0,5,0,15">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
-            <Button Content="CREATE BOUNDARY" Height="35" Margin="0,0,5,0" Background="#2E7D32" Foreground="White" FontWeight="Bold" Click="BtnCreate_Click"/>
-            <Button Grid.Column="1" Content="CLEAN DATA" Height="35" Margin="5,0,0,0" Background="#B22222" Foreground="White" FontWeight="Bold" Click="BtnClean_Click"/>
+            <Button Grid.Column="0" Content="CREATE" Height="35" Margin="0,0,2,0" Background="#2E7D32" Foreground="White" FontWeight="Bold" Click="BtnCreate_Click"/>
+            <Button Grid.Column="1" Content="SYNC DATA" Height="35" Margin="2,0,2,0" Background="#B22222" Foreground="White" FontWeight="Bold" Click="BtnClean_Click"/>
+            <Button Grid.Column="2" Content="EXCEL" Height="35" Margin="2,0,0,0" Background="#107C41" Foreground="White" FontWeight="Bold" Click="BtnExportExcel_Click"/>
         </Grid>
 
-        <DataGrid Grid.Row="3" ItemsSource="{Binding Boundaries}" 
+        <DataGrid x:Name="BoundaryDataGrid" Grid.Row="3" ItemsSource="{Binding Boundaries}" 
                   AutoGenerateColumns="False" IsReadOnly="True" 
                   AlternatingRowBackground="#F0F0F0" GridLinesVisibility="All"
-                  SelectionMode="Single" SelectionUnit="FullRow"
+                  SelectionMode="Extended" SelectionUnit="FullRow"
                   SelectionChanged="DataGrid_SelectionChanged">
             
             <DataGrid.ContextMenu>
@@ -48,9 +51,10 @@
             <DataGrid.Columns>
                 <DataGridTextColumn Header="No" Binding="{Binding No}" Width="35"/>
                 <DataGridTextColumn Header="Plate name" Binding="{Binding PlateName}" Width="*"/>
-                <DataGridTextColumn Header="Area(mm²)" Binding="{Binding Area, StringFormat={}{0:N2}}" Width="80"/>
-                <DataGridTextColumn Header="XCOG(mm)" Binding="{Binding XCog, StringFormat={}{0:N2}}" Width="70"/>
-                <DataGridTextColumn Header="YCOG(mm)" Binding="{Binding YCog, StringFormat={}{0:N2}}" Width="70"/>
+                <DataGridTextColumn Header="Area(mm²)" Binding="{Binding Area, StringFormat={}{0:N2}}" Width="70"/>
+                <DataGridTextColumn Header="XCOG(mm)" Binding="{Binding XCog}" Width="65"/>
+                <DataGridTextColumn Header="YCOG(mm)" Binding="{Binding YCog}" Width="65"/>
+                <DataGridTextColumn Header="Category" Binding="{Binding Category}" Width="70"/> 
             </DataGrid.Columns>
         </DataGrid>
 
