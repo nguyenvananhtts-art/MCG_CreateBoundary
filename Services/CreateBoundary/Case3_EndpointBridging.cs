@@ -5,7 +5,7 @@ using Autodesk.AutoCAD.DatabaseServices;
 using Autodesk.AutoCAD.EditorInput;
 using Autodesk.AutoCAD.Geometry;
 
-namespace MCG_CreateBoundary
+namespace MCG_CreateBoundary.Services
 {
     public class Case3_EndpointBridging
     {

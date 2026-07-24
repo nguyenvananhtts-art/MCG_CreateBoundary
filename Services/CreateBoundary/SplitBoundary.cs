@@ -71,7 +71,7 @@ namespace MCG_CreateBoundary.Services
 
         private static void DrawPhysicalErrorCircle(Transaction tr, Database db, Point3d pt)
         {
-            CreateBoundary.EnsureLayerExists(tr, db, ErrorLayerName, 1);
+            PlateDrawingHelper.EnsureLayerExists(tr, db, ErrorLayerName, 1);
             BlockTable bt = (BlockTable)tr.GetObject(db.BlockTableId, OpenMode.ForRead);
             BlockTableRecord btr = (BlockTableRecord)tr.GetObject(bt[BlockTableRecord.ModelSpace], OpenMode.ForWrite);
             double r = 300.0;
@@ -122,46 +122,23 @@ namespace MCG_CreateBoundary.Services
                 var catBlocks = ScanForCategoryBlocks(tr, btr);
                 Extents3d globalExt; List<Curve> allCurves = FlattenUtils.FlattenAndExtractCurves(ids.ToList(), tr, btr, ed, out globalExt);
                 double globalScale = globalExt.MaxPoint.DistanceTo(globalExt.MinPoint) * 0.05;
-                if (vm.IsInsertCog && hasBasePt) CreateBoundary.InsertBaseCogBlock(tr, db, btr, basePt, globalScale);
+                if (vm.IsInsertCog && hasBasePt) PlateDrawingHelper.InsertBaseCogBlock(tr, db, btr, basePt, globalScale);
 
-                // CHẠY LÕI TỰ VÁ
-                List<Region> regs = Case1_BasicSplit.GetRegions(allCurves, ed);
-                if (regs.Count == 0) regs = Case2_ExtensionSplitLine.GetRegions(allCurves, ed);
-                if (regs.Count == 0) regs = Case3_EndpointBridging.GetRegions(allCurves, ed);
+                // TẦNG 1: SINH MIỀN (tự leo thang sang Case2/Case3 khi hình học hở)
+                List<Region> regs = RegionSolver.Solve(allCurves, ed);
 
-                // PHÂN LOẠI "TẤM PLATE" VÀ "LỖ KHOÉT" (CHỐNG TẠO PLATE RÁC TỪ LỖ)
-                List<Region> validOuterPlates = new List<Region>();
-                List<Region> allHoles = new List<Region>();
-
-                if (vm.IsSubtractHole)
-                {
-                    foreach (Region r1 in regs)
-                    {
-                        foreach (Region r2 in regs)
-                        {
-                            if (r1 == r2) continue;
-                            if (Math.Abs(r1.Area - r2.Area) < 1e-4) continue;
-                            if (BoundaryUtils.IsPointInRegion(r1, BoundaryUtils.GetCentroidFromRegion(r2)))
-                            {
-                                if (!allHoles.Contains(r2)) allHoles.Add(r2); // r2 là cái Lỗ!
-                            }
-                        }
-                    }
-                }
-
-                foreach (Region r in regs)
-                {
-                    if (vm.IsSubtractHole && allHoles.Contains(r)) continue; // Lỗ thì không xuất thành Tấm Thép
-                    validOuterPlates.Add(r);
-                }
+                // TẦNG 2: PHÂN LOẠI TẤM / LỖ / KHUNG BỊ CHIA
+                ed.WriteMessage($"\n[DBG] Solver trả {regs.Count} region: [{string.Join(", ", regs.Select(r => r.Area.ToString("F1")))}]");
+                List<PlateNode> plates = RegionClassifier.Classify(regs, ed);
 
                 int count = 0; int startNo = GetLastNumber(db) + 1;
-                foreach (Region r in validOuterPlates)
+                foreach (PlateNode node in plates)
                 {
-                    BoundaryUtils.ProcessRegionToPlate(r, allHoles, tr, btr, db, $"PL-{startNo + count}", startNo + count, basePt, catBlocks, vm, ed);
+                    BoundaryUtils.ProcessRegionToPlate(node.Plate, node.Holes, tr, btr, db, $"PL-{startNo + count}", startNo + count, basePt, catBlocks, vm, ed);
                     count++;
                 }
 
+                foreach (PlateNode node in plates) { if (node.OwnsPlate && node.Plate != null && !node.Plate.IsDisposed) node.Plate.Dispose(); }
                 foreach (Region r in regs) { if (r != null && !r.IsDisposed) r.Dispose(); }
 
                 if (vm.IsDeleteOriginal && count > 0) { foreach (var id in ids) { Entity e = tr.GetObject(id, OpenMode.ForWrite) as Entity; if (e != null) e.Erase(); } }
@@ -213,7 +190,7 @@ namespace MCG_CreateBoundary.Services
 
                 double globalScale = 1.0;
                 try { double diag = globalRawExtents.MaxPoint.DistanceTo(globalRawExtents.MinPoint); if (diag > 0) globalScale = diag * 0.05; } catch { }
-                if (vm.IsInsertCog && hasBasePt) CreateBoundary.InsertBaseCogBlock(tr, db, btr, basePt, globalScale);
+                if (vm.IsInsertCog && hasBasePt) PlateDrawingHelper.InsertBaseCogBlock(tr, db, btr, basePt, globalScale);
 
                 tr.Commit();
             }
@@ -243,23 +220,23 @@ namespace MCG_CreateBoundary.Services
                             Extents3d ignoredExt;
                             List<Curve> localFlattenedCurves = FlattenUtils.FlattenAndExtractCurves(localIds, tr, btr, ed, out ignoredExt);
 
-                            // LÕI TOÁN HỌC (Sinh ra cả miền ngoài lẫn các lỗ bên trong)
-                            List<Region> localRegs = Case1_BasicSplit.GetRegions(localFlattenedCurves, ed);
-                            if (localRegs.Count == 0) localRegs = Case2_ExtensionSplitLine.GetRegions(localFlattenedCurves, ed);
-                            if (localRegs.Count == 0) localRegs = Case3_EndpointBridging.GetRegions(localFlattenedCurves, ed);
+                            // TẦNG 1: SINH MIỀN
+                            List<Region> localRegs = RegionSolver.Solve(localFlattenedCurves, ed);
 
-                            Region clickedReg = null;
-                            foreach (Region r in localRegs)
+                            // TẦNG 2: PHÂN LOẠI, rồi lấy tấm NHỎ NHẤT chứa con trỏ. Lấy nhỏ nhất
+                            // để click vào một mảnh chia không trả về nguyên cả khung bao ngoài.
+                            List<PlateNode> localPlates = RegionClassifier.Classify(localRegs);
+                            PlateNode clicked = null;
+                            foreach (PlateNode node in localPlates)
                             {
-                                // Tìm đúng cái Plate chứa con trỏ chuột
-                                if (BoundaryUtils.IsPointInRegion(r, pt)) { clickedReg = r; break; }
+                                if (!BoundaryUtils.IsPointInRegion(node.Plate, pt)) continue;
+                                if (clicked == null || node.Plate.Area < clicked.Plate.Area) clicked = node;
                             }
 
-                            if (clickedReg != null)
+                            if (clicked != null)
                             {
                                 string pName = $"PL-{startNo + plateCount}";
-                                // Hàm ProcessRegionToPlate sẽ lo vụ đục lỗ nếu localRegs chứa các đảo bên trong clickedReg
-                                Polyline newPl = BoundaryUtils.ProcessRegionToPlate(clickedReg, localRegs, tr, btr, db, pName, startNo + plateCount, basePt, catBlocks, vm, ed);
+                                Polyline newPl = BoundaryUtils.ProcessRegionToPlate(clicked.Plate, clicked.Holes, tr, btr, db, pName, startNo + plateCount, basePt, catBlocks, vm, ed);
                                 if (newPl != null) AddGhostHighlight(newPl.Clone() as Polyline, 3);
                                 plateCount++;
                                 ed.WriteMessage($"\n  -> Đã tạo {pName} thành công!");
@@ -275,6 +252,7 @@ namespace MCG_CreateBoundary.Services
                                 else ed.WriteMessage("\n[MCG] Không tìm thấy lỗi cụ thể. Hãy kiểm tra lại các ranh giới.");
                             }
 
+                            foreach (PlateNode node in localPlates) { if (node.OwnsPlate && node.Plate != null && !node.Plate.IsDisposed) node.Plate.Dispose(); }
                             foreach (Region r in localRegs) { if (r != null && !r.IsDisposed) r.Dispose(); }
                         }
                         tr.Commit();
@@ -306,7 +284,7 @@ namespace MCG_CreateBoundary.Services
 
         public static List<BoundaryData> ScanDocument(Database db)
         {
-            var res = new List<BoundaryData>(); using (var tr = db.TransactionManager.StartTransaction()) { var btrId = SymbolUtilityServices.GetBlockModelSpaceId(db); var btr = (BlockTableRecord)tr.GetObject(btrId, OpenMode.ForRead); foreach (ObjectId id in btr) { if (id.IsNull || id.IsErased || !id.IsValid) continue; var ent = tr.GetObject(id, OpenMode.ForRead) as Entity; if (ent is Polyline pl && CreateBoundary.HasOurXData(pl)) { var tvs = pl.XData.AsArray(); if (tvs.Length >= 3) { string xStr = "-"; string yStr = "-"; string catStr = "-"; int len = tvs.Length; if (len == 4) { catStr = tvs[3].Value.ToString(); } else if (len == 5) { double baseX = 0; double baseY = 0; double.TryParse(tvs[3].Value.ToString(), out baseX); double.TryParse(tvs[4].Value.ToString(), out baseY); Point3d c = BoundaryUtils.GetCentroidFromPolyline(pl); xStr = Math.Round(c.X - baseX, 2).ToString(); yStr = Math.Round(c.Y - baseY, 2).ToString(); } else if (len >= 6) { double baseX = 0; double baseY = 0; double.TryParse(tvs[3].Value.ToString(), out baseX); double.TryParse(tvs[4].Value.ToString(), out baseY); Point3d c = BoundaryUtils.GetCentroidFromPolyline(pl); xStr = Math.Round(c.X - baseX, 2).ToString(); yStr = Math.Round(c.Y - baseY, 2).ToString(); catStr = tvs[5].Value.ToString(); } res.Add(new BoundaryData { No = (int)tvs[1].Value, PlateName = tvs[2].Value.ToString(), Area = pl.Area, XCog = xStr, YCog = yStr, Category = catStr, Id = id }); } } } tr.Commit(); }
+            var res = new List<BoundaryData>(); using (var tr = db.TransactionManager.StartTransaction()) { var btrId = SymbolUtilityServices.GetBlockModelSpaceId(db); var btr = (BlockTableRecord)tr.GetObject(btrId, OpenMode.ForRead); foreach (ObjectId id in btr) { if (id.IsNull || id.IsErased || !id.IsValid) continue; var ent = tr.GetObject(id, OpenMode.ForRead) as Entity; if (ent is Polyline pl && PlateDrawingHelper.HasOurXData(pl)) { var tvs = pl.XData.AsArray(); if (tvs.Length >= 3) { string xStr = "-"; string yStr = "-"; string catStr = "-"; int len = tvs.Length; if (len == 4) { catStr = tvs[3].Value.ToString(); } else if (len == 5) { double baseX = 0; double baseY = 0; double.TryParse(tvs[3].Value.ToString(), out baseX); double.TryParse(tvs[4].Value.ToString(), out baseY); Point3d c = BoundaryUtils.GetCentroidFromPolyline(pl); xStr = Math.Round(c.X - baseX, 2).ToString(); yStr = Math.Round(c.Y - baseY, 2).ToString(); } else if (len >= 6) { double baseX = 0; double baseY = 0; double.TryParse(tvs[3].Value.ToString(), out baseX); double.TryParse(tvs[4].Value.ToString(), out baseY); Point3d c = BoundaryUtils.GetCentroidFromPolyline(pl); xStr = Math.Round(c.X - baseX, 2).ToString(); yStr = Math.Round(c.Y - baseY, 2).ToString(); catStr = tvs[5].Value.ToString(); } res.Add(new BoundaryData { No = (int)tvs[1].Value, PlateName = tvs[2].Value.ToString(), Area = pl.Area, XCog = xStr, YCog = yStr, Category = catStr, Id = id }); } } } tr.Commit(); }
             return res;
         }
 

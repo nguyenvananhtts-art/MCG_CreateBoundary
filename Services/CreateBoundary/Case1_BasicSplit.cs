@@ -4,7 +4,7 @@ using System.Linq;
 using Autodesk.AutoCAD.DatabaseServices;
 using Autodesk.AutoCAD.EditorInput;
 
-namespace MCG_CreateBoundary
+namespace MCG_CreateBoundary.Services
 {
     public class Case1_BasicSplit
     {

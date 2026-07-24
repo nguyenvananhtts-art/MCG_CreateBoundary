@@ -2,6 +2,7 @@ using Autodesk.AutoCAD.Windows;
 using Autodesk.AutoCAD.ApplicationServices;
 using MCG_CreateBoundary.Views;
 using MCG_CreateBoundary.ViewModels;
+using MCG_CreateBoundary.Services;
 using System;
 
 namespace MCG_CreateBoundary.UI

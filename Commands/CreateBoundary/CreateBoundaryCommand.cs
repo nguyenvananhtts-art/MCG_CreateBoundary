@@ -1,8 +1,9 @@
 using Autodesk.AutoCAD.Runtime;
-using GetPropsTool.UI;
+using MCG_CreateBoundary.UI;
+using MCG_CreateBoundary.Services;
 
-[assembly: CommandClass(typeof(GetPropsTool.Commands.BoundaryCommands))]
-namespace GetPropsTool.Commands
+[assembly: CommandClass(typeof(MCG_CreateBoundary.Commands.BoundaryCommands))]
+namespace MCG_CreateBoundary.Commands
 {
     public class BoundaryCommands
     {

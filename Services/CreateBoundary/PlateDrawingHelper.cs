@@ -4,9 +4,9 @@ using Autodesk.AutoCAD.DatabaseServices;
 using Autodesk.AutoCAD.Geometry;
 using Autodesk.AutoCAD.Colors;
 
-namespace MCG_CreateBoundary
+namespace MCG_CreateBoundary.Services
 {
-    public static class CreateBoundary
+    public static class PlateDrawingHelper
     {
         public const string RegAppName = "MCG_PLATE_DATA";
         public const string TargetLayer = "Mechanical-AM_5";

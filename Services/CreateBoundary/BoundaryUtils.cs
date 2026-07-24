@@ -169,9 +169,9 @@ namespace MCG_CreateBoundary.Services
                             Polyline hPl = ConvertRegionToPolyline(h, ed, "HOLE");
                             if (hPl != null)
                             {
-                                CreateBoundary.EnsureLayerExists(tr, db, CreateBoundary.TargetLayer, 4);
+                                PlateDrawingHelper.EnsureLayerExists(tr, db, PlateDrawingHelper.TargetLayer, 4);
                                 hPl.SetDatabaseDefaults();
-                                hPl.Layer = CreateBoundary.TargetLayer; // Cùng Layer với Plate
+                                hPl.Layer = PlateDrawingHelper.TargetLayer; // Cùng Layer với Plate
                                 hPl.ColorIndex = 1; // Màu Đỏ
                                 btr.AppendEntity(hPl);
                                 tr.AddNewlyCreatedDBObject(hPl, true);
@@ -189,15 +189,15 @@ namespace MCG_CreateBoundary.Services
             Polyline pl = ConvertRegionToPolyline(reg, ed, name);
             if (pl != null)
             {
-                CreateBoundary.EnsureLayerExists(tr, db, CreateBoundary.TargetLayer, 4);
-                pl.SetDatabaseDefaults(); pl.Layer = CreateBoundary.TargetLayer; pl.ColorIndex = 256; // ByLayer
+                PlateDrawingHelper.EnsureLayerExists(tr, db, PlateDrawingHelper.TargetLayer, 4);
+                pl.SetDatabaseDefaults(); pl.Layer = PlateDrawingHelper.TargetLayer; pl.ColorIndex = 256; // ByLayer
                 btr.AppendEntity(pl); tr.AddNewlyCreatedDBObject(pl, true);
 
                 string category = "-";
                 if (areaM2 > 20.0) { foreach (var cat in catBlocks) { if (IsPointInRegion(reg, cat.Item1)) { category = cat.Item2; break; } } }
 
                 // Lưu dữ liệu Area MỚI và COG MỚI vào Data
-                CreateBoundary.AddXData(pl, no, name, basePoint, category, vm.IsInsertCog, tr, db);
+                PlateDrawingHelper.AddXData(pl, no, name, basePoint, category, vm.IsInsertCog, tr, db);
 
                 double baseScale = reg.GeometricExtents.MinPoint.DistanceTo(reg.GeometricExtents.MaxPoint) * 0.04;
                 double cogScale = baseScale * 0.5;
@@ -206,15 +206,15 @@ namespace MCG_CreateBoundary.Services
                 if (isGiantPlate)
                 {
                     cogScale = 500.0; Point3d textLoc = new Point3d(cog.X, cog.Y + 350.0, cog.Z);
-                    CreateBoundary.CreateMTextWithArea(tr, btr, textLoc, name, areaM2);
-                    CreateBoundary.InsertCogBlock(tr, db, btr, cog, cogScale);
+                    PlateDrawingHelper.CreateMTextWithArea(tr, btr, textLoc, name, areaM2);
+                    PlateDrawingHelper.InsertCogBlock(tr, db, btr, cog, cogScale);
                 }
                 else
                 {
                     double yOffset = (0.5 * cogScale) + (baseScale * 0.5) + (baseScale * 0.2);
                     Point3d textLoc = vm.IsInsertCog ? new Point3d(cog.X, cog.Y + yOffset, cog.Z) : cog;
-                    if (vm.IsCreateText) CreateBoundary.CreateMText(tr, btr, textLoc, name, baseScale);
-                    if (vm.IsInsertCog) CreateBoundary.InsertCogBlock(tr, db, btr, cog, cogScale);
+                    if (vm.IsCreateText) PlateDrawingHelper.CreateMText(tr, btr, textLoc, name, baseScale);
+                    if (vm.IsInsertCog) PlateDrawingHelper.InsertCogBlock(tr, db, btr, cog, cogScale);
                 }
             }
             return pl;
