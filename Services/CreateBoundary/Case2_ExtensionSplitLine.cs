@@ -72,10 +72,6 @@ namespace MCG_CreateBoundary.Services
             List<Curve> extensions = new List<Curve>();
             Curve outerBoundary = curves.OrderByDescending(c => GetCurveLength(c)).FirstOrDefault();
 
-            // Chuỗi liền mạch với khung ngoài (khung + khấc + mọi curve nối vào nó). Tia kéo dài đầu
-            // mút đường chia phải ưu tiên chạm vào chuỗi này, KHÔNG nối nhầm vào đảo/lỗ độc lập.
-            var frameChain = BuildFrameChain(curves, outerBoundary);
-
             foreach (Curve c in curves)
             {
                 if (c == outerBoundary) continue;
@@ -86,7 +82,7 @@ namespace MCG_CreateBoundary.Services
                     Vector3d dirStart = GetDirectionAtStart(c);
                     if (!dirStart.IsZeroLength())
                     {
-                        Point3d? hit = FireRayWithMidpointCheck(c.StartPoint, dirStart, midPoint, c, curves, frameChain);
+                        Point3d? hit = FireRayWithMidpointCheck(c.StartPoint, dirStart, midPoint, c, curves);
                         if (hit.HasValue)
                         {
                             if (c is Line line) line.StartPoint = hit.Value;
@@ -100,7 +96,7 @@ namespace MCG_CreateBoundary.Services
                     Vector3d dirEnd = GetDirectionAtEnd(c);
                     if (!dirEnd.IsZeroLength())
                     {
-                        Point3d? hit = FireRayWithMidpointCheck(c.EndPoint, dirEnd, midPoint, c, curves, frameChain);
+                        Point3d? hit = FireRayWithMidpointCheck(c.EndPoint, dirEnd, midPoint, c, curves);
                         if (hit.HasValue)
                         {
                             if (c is Line line) line.EndPoint = hit.Value;
@@ -112,19 +108,7 @@ namespace MCG_CreateBoundary.Services
             curves.AddRange(extensions);
         }
 
-        private static Point3d? FireRayWithMidpointCheck(Point3d origin, Vector3d dir, Point3d midPoint, Curve sourceCurve, List<Curve> others, HashSet<Curve> frameChain)
-        {
-            // LƯỢT 1 (ưu tiên): chỉ nối vào chuỗi liền mạch với khung ngoài — tránh nối nhầm vào
-            // đảo/lỗ độc lập chỉ tình cờ chắn đường tia.
-            Point3d? hit = FireRay(origin, dir, sourceCurve, others, frameChain, true);
-            if (hit.HasValue) return hit;
-
-            // LƯỢT 2 (fallback): nếu lượt 1 không trúng gì, xét lại TẤT CẢ target như hành vi gốc —
-            // đảm bảo không bao giờ tệ hơn trước.
-            return FireRay(origin, dir, sourceCurve, others, frameChain, false);
-        }
-
-        private static Point3d? FireRay(Point3d origin, Vector3d dir, Curve sourceCurve, List<Curve> others, HashSet<Curve> frameChain, bool restrictToFrameChain)
+        private static Point3d? FireRayWithMidpointCheck(Point3d origin, Vector3d dir, Point3d midPoint, Curve sourceCurve, List<Curve> others)
         {
             using (Ray ray = new Ray { BasePoint = origin, UnitDir = dir })
             {
@@ -134,8 +118,6 @@ namespace MCG_CreateBoundary.Services
                 foreach (Curve target in others)
                 {
                     if (target == sourceCurve) continue;
-                    if (restrictToFrameChain && !frameChain.Contains(target)) continue;
-
                     Point3dCollection pts = new Point3dCollection();
                     ray.IntersectWith(target, Intersect.OnBothOperands, pts, IntPtr.Zero, IntPtr.Zero);
 
@@ -157,31 +139,6 @@ namespace MCG_CreateBoundary.Services
                 }
                 return bestHit;
             }
-        }
-
-        // Chuỗi curve liền mạch với khung ngoài: BFS lan từ outerBoundary qua các curve chạm đầu-đuôi
-        // (khung + khấc + đường chia đã nối...). Đảo/lỗ độc lập không chạm khung sẽ KHÔNG thuộc chuỗi.
-        private static HashSet<Curve> BuildFrameChain(List<Curve> curves, Curve outerBoundary, double tol = 1e-3)
-        {
-            var chain = new HashSet<Curve> { outerBoundary };
-            var queue = new Queue<Curve>();
-            queue.Enqueue(outerBoundary);
-            while (queue.Count > 0)
-            {
-                Curve cur = queue.Dequeue();
-                foreach (Curve other in curves)
-                {
-                    if (chain.Contains(other)) continue;
-                    if (TouchesEndpoint(cur, other, tol)) { chain.Add(other); queue.Enqueue(other); }
-                }
-            }
-            return chain;
-        }
-
-        private static bool TouchesEndpoint(Curve a, Curve b, double tol)
-        {
-            return a.StartPoint.DistanceTo(b.StartPoint) < tol || a.StartPoint.DistanceTo(b.EndPoint) < tol ||
-                   a.EndPoint.DistanceTo(b.StartPoint) < tol || a.EndPoint.DistanceTo(b.EndPoint) < tol;
         }
 
         private static List<Polyline> ExtractClosedLoopsByRightHandRule(DBObjectCollection shatteredCurves)

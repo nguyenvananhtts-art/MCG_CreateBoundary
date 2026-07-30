@@ -5,47 +5,6 @@
 
 ---
 
-## Session 2026-07-24 (Claude Code) — Case2: tia chỉ nối vào chuỗi liền mạch với khung ngoài
-
-### Đã làm
-Bổ sung (KHÔNG thay thế Việc 1/Việc 2 phiên trước) vào `Case2_ExtensionSplitLine.cs`:
-
-- **Thêm `BuildFrameChain`**: BFS lan từ `outerBoundary` qua các curve chạm đầu-đuôi (tol 1e-3) → tập
-  "chuỗi liền mạch với khung ngoài" (khung + khấc + curve nối vào nó). Đảo/lỗ độc lập (lỗ tròn/chữ
-  nhật không chạm khung) KHÔNG thuộc chuỗi. Kèm helper `TouchesEndpoint`.
-- **`SmartTopologyGapClosure`**: gọi `BuildFrameChain` một lần trước vòng lặp, truyền `frameChain` vào
-  cả 2 lời gọi bắn tia.
-- **`FireRayWithMidpointCheck`**: đổi thành 2 lượt qua hàm dùng chung `FireRay(..., restrictToFrameChain)`:
-  - Lượt 1 (ưu tiên): chỉ xét target thuộc `frameChain`, tiêu chí `distFromOrigin` nhỏ nhất (giữ
-    nguyên Việc 2).
-  - Lượt 2 (fallback, chỉ khi lượt 1 không trúng): xét lại TẤT CẢ target như hành vi gốc → không bao
-    giờ tệ hơn trước.
-
-### Lý do
-Việc 2 (distFromOrigin) chưa đủ: khi đầu mút đường chia dở dang nằm gần 1 lỗ độc lập, tia bắn trúng
-cạnh lỗ (chướng ngại gần nhất) thay vì biên khung thật → sinh region sai (29177.6 trong log TEST A) →
-khung không chia được thành 2 nửa. Ràng buộc tia vào chuỗi khung ngoài loại bỏ việc nối nhầm này.
-
-### Trạng thái
-- Build `dotnet build -c Debug` **PASS** (0 error, 0 warning CS).
-- **CHƯA test trong AutoCAD** (Claude Code không có AutoCAD) — cần user tự test 3 case dưới, chưa có
-  log CAD thật xác nhận nên KHÔNG tự nhận là đã xong.
-
-### Giá trị kỳ vọng để user đối chiếu khi test
-- **TEST A** (khung + đường chia dọc dở dang + 3 khấc + lỗ chữ nhật): kỳ vọng **PASS lần này** — đúng
-  2 region chính (khung bị chia 2 nửa), KHÔNG còn region ~29177.6, KHÔNG sụp thành 1 tấm.
-- **TEST B** (hồi quy PL-198, BẮT BUỘC PASS, sai lệch >0.1% = FAIL): 5 region rời, không lồng nhau:
-  `16,105,747.7 | 9,963,112.7 | 9,195,149.5 | 8,695,822.2 | 6,519,922.9`.
-- **TEST C** (hồi quy đơn giản, khung + 3 khấc, không đường chia, không lỗ): kỳ vọng vẫn ra 1 plate
-  duy nhất, 3 khấc trừ đúng — kiểm tra frameChain không lọc quá tay.
-
-### Phạm vi / ràng buộc đã giữ
-- KHÔNG đụng `ExtractClosedLoopsByRightHandRule`, tolerance node 0.05 giữ nguyên.
-- KHÔNG xử lý ca "2 đường chia dở dang tự nối kiểu chữ T/L" (user xác nhận không tồn tại thực tế).
-- Việc 1 + Việc 2 phiên trước giữ nguyên. Log [DBG] vẫn để nguyên phục vụ debug.
-
----
-
 ## Session 2026-07-24 (Claude Code) — Bỏ gate checkbox trừ lỗ + sửa tiêu chí bắn tia Case2
 
 ### Đã làm
