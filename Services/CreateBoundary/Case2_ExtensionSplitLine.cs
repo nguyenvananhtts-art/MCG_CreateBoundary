@@ -113,7 +113,7 @@ namespace MCG_CreateBoundary.Services
             using (Ray ray = new Ray { BasePoint = origin, UnitDir = dir })
             {
                 Point3d? bestHit = null;
-                double minMidDistance = double.MaxValue;
+                double minOriginDistance = double.MaxValue;
 
                 foreach (Curve target in others)
                 {
@@ -126,10 +126,12 @@ namespace MCG_CreateBoundary.Services
                         double distFromOrigin = origin.DistanceTo(hit);
                         if (distFromOrigin > 1e-3)
                         {
-                            double distToMid = hit.DistanceTo(midPoint);
-                            if (distToMid < minMidDistance)
+                            // Chọn chướng ngại vật ĐẦU TIÊN dọc theo tia (gần gốc tia nhất),
+                            // thay vì điểm gần midpoint nhất — tránh vượt qua lỗ (tròn/chữ nhật)
+                            // nằm sát đầu mút đường chia rồi nối nhầm ra biên xa.
+                            if (distFromOrigin < minOriginDistance)
                             {
-                                minMidDistance = distToMid;
+                                minOriginDistance = distFromOrigin;
                                 bestHit = hit;
                             }
                         }

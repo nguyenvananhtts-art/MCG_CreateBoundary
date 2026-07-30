@@ -138,7 +138,9 @@ namespace MCG_CreateBoundary.Services
             Point3d cog = GetCentroidFromRegion(reg);
 
             // LOGIC "ĐẢO TRONG ĐẢO" VÀ TRỪ LỖ
-            if (vm.IsSubtractHole && holeCandidates != null)
+            // Luôn tự động trừ lỗ nếu RegionClassifier đã xác định đây là lỗ thật,
+            // không còn phụ thuộc checkbox vm.IsSubtractHole (đúng nghĩa "Automatically").
+            if (holeCandidates != null)
             {
                 List<Region> actualHoles = new List<Region>();
                 foreach (Region candidate in holeCandidates)

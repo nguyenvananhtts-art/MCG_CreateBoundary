@@ -5,6 +5,52 @@
 
 ---
 
+## Session 2026-07-24 (Claude Code) — Bỏ gate checkbox trừ lỗ + sửa tiêu chí bắn tia Case2
+
+### Đã làm
+Hai thay đổi độc lập, có bằng chứng log CAD thật (thảo luận kỹ trên Claude web trước khi code):
+
+**Việc 1 — `BoundaryUtils.ProcessRegionToPlate`:**
+- Đổi `if (vm.IsSubtractHole && holeCandidates != null)` → `if (holeCandidates != null)`.
+- Lý do: RegionClassifier (tầng 2) đã xác định đâu là lỗ thật, nên việc trừ lỗ phải luôn tự động —
+  đúng nghĩa "Automatically" trong tên checkbox. Trước đây checkbox tắt thì lỗ không bị trừ dù đã
+  phân loại đúng là lỗ.
+- Giữ nguyên toàn bộ logic bên trong (Boolean subtract, vẽ viền đỏ, tính lại Area/COG).
+- Checkbox `IsSubtractHole` trong XAML/ViewModel **vẫn giữ nguyên** (chỉ ngắt kết nối, dành quyết định
+  sau) — không xóa.
+
+**Việc 2 — `Case2_ExtensionSplitLine.FireRayWithMidpointCheck`:**
+- Đổi tiêu chí chọn `bestHit`: từ điểm cắt có `distToMid` (gần midpoint đường chia) nhỏ nhất → sang
+  điểm cắt có `distFromOrigin` (gần gốc tia) nhỏ nhất = chướng ngại vật ĐẦU TIÊN dọc theo tia.
+- Giữ nguyên bộ lọc `distFromOrigin > 1e-3` (tránh tự chạm chính nó).
+- Lý do: tiêu chí cũ "gần midpoint" khiến tia vượt qua lỗ (tròn/chữ nhật) nằm sát đầu mút đường chia
+  dở dang rồi nối nhầm ra biên xa, gây sai hình khi có lỗ gần đường chia.
+
+### Trạng thái
+- Build `dotnet build -c Debug` **PASS** (0 error, 0 warning CS). Warning MSB3061 duy nhất là do
+  AutoCAD đang khoá DLL cũ, không liên quan thay đổi.
+- **CHƯA test trong AutoCAD** (Claude Code không có AutoCAD) — cần user tự test 2 case dưới.
+
+### Phát sinh ngoài kế hoạch
+- Sau khi đổi Việc 2, tham số `midPoint` của `FireRayWithMidpointCheck` trở thành **không còn được
+  dùng** (IDE báo Hint "Remove unused parameter"). Theo constraint "không refactor thêm, không đổi
+  tên biến/hàm khác" → **cố ý giữ nguyên** tham số, không bỏ (bỏ sẽ phải đổi cả signature + call
+  site, vượt phạm vi yêu cầu). Chỉ là Hint, không phải warning/error, không ảnh hưởng build.
+
+### Giá trị kỳ vọng để user đối chiếu khi test
+**TEST A — case lỗ chữ nhật (kỳ vọng hết lỗi):**
+- Quét chọn: khung bao + đường chia dọc dở dang + 3 khấc lược + lỗ chữ nhật.
+- Kỳ vọng: 2 region chính, tổng diện tích khớp khung ngoài (logic "khung bị chia"). KHÔNG còn region
+  diện tích ~29177.6, KHÔNG còn hiện tượng cả khung sụp thành 1 TẤM duy nhất.
+
+**TEST B — hồi quy hình PL-198 phức tạp (sai lệch >0.1% coi như FAIL, báo ngay):**
+- Baseline (trước sửa, đã xác nhận đúng): 5 region rời, không lồng nhau:
+  `16,105,747.7 | 9,963,112.7 | 9,195,149.5 | 8,695,822.2 | 6,519,922.9`
+- Kỳ vọng sau sửa: log `[DBG]` ra đúng 5 giá trị trên (thứ tự có thể khác, tập giá trị phải khớp),
+  KHÔNG ít/nhiều hơn 5 region, không region nào lồng nhau.
+
+---
+
 ## Session 2026-07-23 (Claude web) — Phân tích logic 3-case, chưa code
 
 ### Đã làm
