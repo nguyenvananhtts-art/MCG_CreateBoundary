@@ -37,6 +37,28 @@ Hai thay đổi độc lập, có bằng chứng log CAD thật (thảo luận k
   tên biến/hàm khác" → **cố ý giữ nguyên** tham số, không bỏ (bỏ sẽ phải đổi cả signature + call
   site, vượt phạm vi yêu cầu). Chỉ là Hint, không phải warning/error, không ảnh hưởng build.
 
+### KẾT QUẢ TEST (user chạy AutoCAD, có log [DBG] thật)
+- **TEST B — PASS.** Hình PL-198 vẫn cho đúng 5 region rời, không lồng nhau, không bị phá vỡ.
+- **TEST A — FAIL.** Vẫn sụp thành 1 tấm, region 29177.6 vẫn còn. Log thật:
+  ```
+  Solver trả 6 region: [29177.6, 113104.5, 3795, 3795, 3795, 234556.4]
+  #0 area=234556.4 ROOT con=[1,2,3,4,5]   -> là TẤM, lỗ=[1,2,3,4,5]
+  #1 area=113104.5 parent=#0   (chỉ MỘT nửa)
+  #2 area=29177.6  parent=#0   (lỗ chữ nhật)
+  #3,4,5 = 3795.0  parent=#0   (3 khấc)
+  ```
+- **Chẩn đoán (đã chứng minh bằng số):** đường chia dọc dở dang chỉ khép được MỘT bên
+  (sinh ra nửa 113104.5); nửa còn lại (~121452) không khép nên vẫn dính trong khung nguyên #0.
+  Tổng con của #0 = 153667.1 / 234556.4 = 0.655 < 0.99 → không đạt ngưỡng "khung bị chia" →
+  sụp thành 1 tấm.
+- **Việc 1 XÁC NHẬN hoạt động:** cột "Không chọn checkbox" vẫn vẽ lỗ màu đỏ (auto-subtract).
+- **Việc 2 cải thiện nhưng CHƯA ĐỦ:** trước đó nhiều khả năng 0 nửa khép; nay 1 nửa khép. Cần cả 2.
+- **Kết luận hướng sửa:** classifier KHÔNG thể tự cứu (thiếu hẳn hình học nửa thứ 2). Fix bắt buộc
+  ở tầng khép khe hở Case2 (`SmartTopologyGapClosure` + `ExtractClosedLoopsByRightHandRule`) để
+  đường chia dở dang khép ĐỦ CẢ 2 BÊN. Đây là thay đổi mới, sâu hơn Việc 2 → CHỜ THẢO LUẬN CLAUDE WEB,
+  chưa code (đúng constraint "không improvise heuristic này").
+- Log [DBG] vẫn để nguyên trong code phục vụ debug tiếp; gỡ sau khi chốt fix.
+
 ### Giá trị kỳ vọng để user đối chiếu khi test
 **TEST A — case lỗ chữ nhật (kỳ vọng hết lỗi):**
 - Quét chọn: khung bao + đường chia dọc dở dang + 3 khấc lược + lỗ chữ nhật.
