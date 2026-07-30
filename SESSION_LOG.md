@@ -5,6 +5,34 @@
 
 ---
 
+## Session 2026-07-24 (Claude Code) — REVERT frameChain (d59d7f93f)
+
+### Đã làm
+- `git revert d59d7f93f` (không dùng reset --hard, giữ lịch sử) — hoàn tác commit "Case2: tia kéo dài
+  đường chia chỉ nối vào chuỗi liền mạch với khung ngoài" (`BuildFrameChain` + `TouchesEndpoint` +
+  `FireRay` 2 lượt). Tạo commit revert mới.
+- Chỉ revert đúng 1 commit d59d7f93f. KHÔNG đụng c9f1fe5ae (Việc 1+2) và các commit docs.
+- Build lại `dotnet build -c Debug` **PASS**. Đã grep xác nhận `BuildFrameChain`/`frameChain` = 0 (sạch).
+
+### Lý do revert (test xác nhận trên Claude web)
+- Thay đổi frameChain **KHÔNG sửa được bug gốc**: region 29177.6 vẫn còn.
+- Còn gây **hồi quy nặng hơn**: case khung + khấc + đường chia + lỗ chữ nhật sinh **14 region rác**
+  thay vì 6 như baseline. Ràng buộc tia vào frameChain phản tác dụng — làm nát topology.
+- Kết luận: hướng "ràng buộc tia vào chuỗi khung ngoài" là sai hướng → bỏ, quay lại trạng thái sau
+  Việc 1+Việc 2 (commit c9f1fe5ae) để tìm hướng khác.
+
+### Số liệu TEST A trước/sau frameChain (để đối chiếu)
+- Trước frameChain (chỉ có Việc 2): 6 region — `[29177.6, 113104.5, 3795, 3795, 3795, 234556.4]`,
+  sụp thành 1 tấm (bug gốc, region 29177.6 còn).
+- Sau frameChain: **14 region rác** (hồi quy nặng), 29177.6 vẫn còn → tệ hơn hẳn.
+- Sau revert: quay về đúng trạng thái "trước frameChain" ở trên.
+
+### Trạng thái
+- Code Case2 = trạng thái sau Việc 1+Việc 2 (c9f1fe5ae). Bug gốc TEST A (sụp 1 tấm, 29177.6) VẪN CÒN,
+  chờ hướng sửa mới từ Claude web. Log [DBG] vẫn để nguyên phục vụ debug.
+
+---
+
 ## Session 2026-07-24 (Claude Code) — Bỏ gate checkbox trừ lỗ + sửa tiêu chí bắn tia Case2
 
 ### Đã làm
